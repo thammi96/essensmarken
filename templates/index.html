@@ -517,85 +517,94 @@
         const loadingPercentage = document.getElementById('loading-percentage');
 
         form.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent standard page reload/submit
+            e.preventDefault(); // Prevent standard page reload
             
             // Show overlay modal
             loadingOverlay.classList.remove('hidden');
             
-            let progress = 0;
             loadingProgressBar.style.width = '0%';
             loadingProgressBar.className = "bg-gradient-to-r from-blue-600 to-indigo-600 h-2 transition-all duration-300 ease-out";
-            loadingPercentage.textContent = '0% abgeschlossen';
+            loadingPercentage.textContent = 'Bereite Generierung vor...';
             
-            // Increment progress simulated over time
-            const interval = setInterval(() => {
-                if (progress < 90) {
-                    let increment = progress < 50 ? 8 : (progress < 80 ? 3 : 0.8);
-                    progress += increment;
-                    loadingProgressBar.style.width = `${progress}%`;
-                    loadingPercentage.textContent = `${Math.round(progress)}% abgeschlossen`;
-                }
-            }, 150);
+            const totalPages = updatePageEstimate();
 
             try {
                 const formData = new FormData(form);
-                const response = await fetch('/generate', {
+                const initResponse = await fetch('/generate', {
                     method: 'POST',
                     body: formData
                 });
 
-                if (!response.ok) {
-                    throw new Error('Fehler bei der PDF-Generierung auf dem Server.');
+                if (!initResponse.ok) {
+                    throw new Error('Verbindung zum Server fehlgeschlagen.');
                 }
 
-                // Complete the progress bar
-                clearInterval(interval);
-                loadingProgressBar.style.width = '100%';
-                loadingPercentage.textContent = 'Erfolgreich generiert!';
-
-                const blob = await response.blob();
+                const initData = await initResponse.json();
+                const taskId = initData.task_id;
                 
-                // Get filename from response header or default
-                let filename = 'verzehrkarten.pdf';
-                const disposition = response.headers.get('Content-Disposition');
-                if (disposition && disposition.indexOf('attachment') !== -1) {
-                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                    const matches = filenameRegex.exec(disposition);
-                    if (matches != null && matches[1]) { 
-                        filename = matches[1].replace(/['"]/g, '');
+                // Start polling progress
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const progResponse = await fetch(`/progress/${taskId}`);
+                        if (!progResponse.ok) return;
+                        
+                        const progData = await progResponse.json();
+                        
+                        if (progData.status === 'rendering') {
+                            let percentage = 5;
+                            let subtext = progData.step || "Verarbeite...";
+                            
+                            if (progData.page > 0) {
+                                // Calculate real layout progress percentage
+                                const layoutPercentage = Math.min(100, Math.round((progData.page / totalPages) * 100));
+                                // Scale from 15% to 95%
+                                percentage = 15 + Math.round((progData.page / totalPages) * 80);
+                                subtext = `Erstelle Layout: Seite ${progData.page} von ${totalPages}`;
+                            } else if (progData.step.includes("CSS")) {
+                                percentage = 10;
+                            } else if (progData.step.includes("Format")) {
+                                percentage = 15;
+                            }
+                            
+                            loadingProgressBar.style.width = `${percentage}%`;
+                            loadingPercentage.textContent = `${subtext} (${percentage}%)`;
+                            
+                        } else if (progData.status === 'done') {
+                            clearInterval(pollInterval);
+                            loadingProgressBar.style.width = '100%';
+                            loadingPercentage.textContent = 'Erfolgreich generiert!';
+                            
+                            // Trigger download from task download endpoint
+                            const downloadUrl = `/download/${taskId}`;
+                            const a = document.createElement('a');
+                            a.href = downloadUrl;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            
+                            // Hide overlay
+                            setTimeout(() => {
+                                loadingOverlay.classList.add('hidden');
+                            }, 1000);
+                            
+                        } else if (progData.status === 'error') {
+                            clearInterval(pollInterval);
+                            throw new Error(progData.error || 'Serverfehler bei WeasyPrint.');
+                        }
+                    } catch (pollErr) {
+                        console.error("Polling error:", pollErr);
                     }
-                } else {
-                    const titleVal = titleInput.value.toLowerCase().replace(/[^a-z0-9]/g, '_');
-                    filename = `verzehrkarten_${titleVal}.pdf`;
-                }
-
-                // Trigger programmatic download of the blob
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-
-                // Hide overlay after animation
-                setTimeout(() => {
-                    loadingOverlay.classList.add('hidden');
-                }, 800);
+                }, 250);
 
             } catch (error) {
                 console.error(error);
-                clearInterval(interval);
-                loadingPercentage.textContent = 'Fehler bei der Generierung!';
-                // Turn bar red to signal error state
+                loadingPercentage.textContent = `Fehler: ${error.message}`;
                 loadingProgressBar.className = "bg-red-500 h-2 transition-all duration-300";
                 loadingProgressBar.style.width = '100%';
                 
-                // Dismiss after a few seconds
                 setTimeout(() => {
                     loadingOverlay.classList.add('hidden');
-                }, 3000);
+                }, 4000);
             }
         });
     </script>
