@@ -20,6 +20,8 @@
 
         /* Default Ticket Scaling Variables (2x2) */
         :root {
+            --ticket-width: 95mm;
+            --ticket-height: 138.5mm;
             --ticket-padding: 8mm;
             --header-height: 20mm;
             --logo-size: 18mm;
@@ -29,12 +31,15 @@
             --box-val-size: 11pt;
             --box-unit-size: 6pt;
             --footer-size: 7pt;
-            --gap-size: 2mm;
+            --box-size: 17mm;
+            --box-margin: 1.5mm;
             --border-width: 1.5px;
         }
 
         /* 4x4 Sizing overrides */
         .layout-size-4x4 {
+            --ticket-width: 47.5mm;
+            --ticket-height: 69.25mm;
             --ticket-padding: 3mm;
             --header-height: 12mm;
             --logo-size: 10mm;
@@ -44,12 +49,15 @@
             --box-val-size: 7pt;
             --box-unit-size: 4pt;
             --footer-size: 5pt;
-            --gap-size: 1.2mm;
+            --box-size: 8.5mm;
+            --box-margin: 0.8mm;
             --border-width: 1px;
         }
 
         /* 4x6 Sizing overrides */
         .layout-size-4x6 {
+            --ticket-width: 47.5mm;
+            --ticket-height: 46.16mm;
             --ticket-padding: 2mm;
             --header-height: 9mm;
             --logo-size: 8mm;
@@ -59,36 +67,13 @@
             --box-val-size: 5.5pt;
             --box-unit-size: 3.5pt;
             --footer-size: 4pt;
-            --gap-size: 1mm;
+            --box-size: 8.8mm;
+            --box-margin: 0.5mm;
             --border-width: 1px;
         }
 
-        /* Page Layout Grids (Portrait) */
-        {% if layout_format == 'portrait' %}
-            @page {
-                size: A4 portrait;
-                margin: 10mm;
-            }
-            .page {
-                width: 190mm;
-                height: 277mm;
-                display: grid;
-                page-break-after: always;
-            }
-            .grid-2x2 {
-                grid-template-columns: 95mm 95mm;
-                grid-template-rows: 138.5mm 138.5mm;
-            }
-            .grid-4x4 {
-                grid-template-columns: 47.5mm 47.5mm 47.5mm 47.5mm;
-                grid-template-rows: 69.25mm 69.25mm 69.25mm 69.25mm;
-            }
-            .grid-4x6 {
-                grid-template-columns: 47.5mm 47.5mm 47.5mm 47.5mm;
-                grid-template-rows: 46.16mm 46.16mm 46.16mm 46.16mm 46.16mm 46.16mm;
-            }
-        {% else %}
-            /* Page Layout Grids (Landscape) */
+        /* Landscape adjustments */
+        {% if layout_format == 'landscape' %}
             @page {
                 size: A4 landscape;
                 margin: 10mm;
@@ -96,20 +81,32 @@
             .page {
                 width: 277mm;
                 height: 190mm;
-                display: grid;
                 page-break-after: always;
             }
-            .grid-2x2 {
-                grid-template-columns: 138.5mm 138.5mm;
-                grid-template-rows: 95mm 95mm;
+            /* Override sizes for landscape grids */
+            .layout-size-2x2 {
+                --ticket-width: 138.5mm;
+                --ticket-height: 95mm;
             }
-            .grid-4x4 {
-                grid-template-columns: 69.25mm 69.25mm 69.25mm 69.25mm;
-                grid-template-rows: 47.5mm 47.5mm 47.5mm 47.5mm;
+            .layout-size-4x4 {
+                --ticket-width: 69.25mm;
+                --ticket-height: 47.5mm;
             }
-            .grid-4x6 {
-                grid-template-columns: 46.16mm 46.16mm 46.16mm 46.16mm 46.16mm 46.16mm;
-                grid-template-rows: 47.5mm 47.5mm 47.5mm 47.5mm;
+            .layout-size-4x6 {
+                --ticket-width: 46.16mm;
+                --ticket-height: 47.5mm;
+                --box-size: 8.5mm;
+            }
+        {% else %}
+            /* Portrait page boundaries */
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
+            .page {
+                width: 190mm;
+                height: 277mm;
+                page-break-after: always;
             }
         {% endif %}
 
@@ -117,16 +114,16 @@
             page-break-after: avoid;
         }
 
-        /* Ticket Design */
+        /* Ticket Design using fast Float layout */
         .ticket {
+            width: var(--ticket-width);
+            height: var(--ticket-height);
+            float: left;
             border: 1px dashed #9ca3af;
             padding: var(--ticket-padding);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow: hidden;
             background-color: #ffffff;
             position: relative;
+            overflow: hidden;
         }
 
         /* Top colored ribbon */
@@ -141,16 +138,15 @@
         }
 
         .ticket-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            width: 100%;
             height: var(--header-height);
-            margin-bottom: 2mm;
             border-bottom: 1px solid #f3f4f6;
             padding-bottom: 1.5mm;
+            margin-bottom: 2mm;
         }
 
         .logo-container {
+            float: left;
             width: var(--logo-size);
             height: var(--logo-size);
             display: flex;
@@ -176,9 +172,9 @@
         }
 
         .ticket-info {
+            float: right;
             text-align: right;
-            flex-grow: 1;
-            padding-left: 2mm;
+            width: calc(100% - var(--logo-size) - 2mm);
         }
 
         .event-title {
@@ -213,25 +209,22 @@
             line-height: 1;
         }
 
-        /* Stamp Boxes Grid */
-        .boxes-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: var(--gap-size);
-            flex-grow: 1;
-            align-content: start;
+        /* Fast inline-block layout for stamp grid */
+        .boxes-container {
+            width: 100%;
+            text-align: left;
         }
 
         .box {
+            display: inline-block;
+            vertical-align: top;
+            width: var(--box-size);
+            height: var(--box-size);
+            margin: var(--box-margin);
             border-style: solid;
             border-width: var(--border-width);
             border-radius: 4px;
-            aspect-ratio: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
+            text-align: center;
         }
 
         /* Denomination colors */
@@ -252,6 +245,15 @@
             border-color: #a5d8ff !important;
         }
 
+        .box-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
         .box-val {
             font-size: var(--box-val-size);
             font-weight: 800;
@@ -267,13 +269,17 @@
             line-height: 1;
         }
 
-        /* Footer styling */
+        /* Clear floats after tickets container */
+        .clear {
+            clear: both;
+        }
+
+        /* Footer styling placed at the absolute bottom of the ticket */
         .ticket-footer {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin-top: 2mm;
+            position: absolute;
+            bottom: var(--ticket-padding);
+            left: var(--ticket-padding);
+            right: var(--ticket-padding);
             font-size: var(--footer-size);
             color: #9ca3af;
             border-top: 1px dashed #e5e7eb;
@@ -286,6 +292,7 @@
             font-weight: 600;
             margin-top: 0.5mm;
             font-size: calc(var(--footer-size) - 1.5pt);
+            display: block;
         }
     </style>
 </head>
@@ -302,7 +309,7 @@
     {% set total_pages = ((ticket_count + tickets_per_page - 1) // tickets_per_page) | int %}
     
     {% for page_idx in range(total_pages) %}
-    <div class="page grid-{{ grid_layout }}">
+    <div class="page">
         {% for t_idx in range(tickets_per_page) %}
             {% set current_ticket_num = page_idx * tickets_per_page + t_idx + 1 %}
             {% if current_ticket_num <= ticket_count %}
@@ -321,10 +328,11 @@
                         <div class="ticket-subtitle">VERZEHRKARTE</div>
                         <div class="ticket-value-badge">{{ "%.2f"|format(total_value) }} &euro;</div>
                     </div>
+                    <div class="clear"></div>
                 </div>
 
                 <!-- Consumption stamp boxes -->
-                <div class="boxes-grid">
+                <div class="boxes-container">
                     {% for val in boxes %}
                         {% if val == 2.00 %}
                             {% set box_class = "box-2-00" %}
@@ -336,8 +344,10 @@
                             {% set box_class = "box-other" %}
                         {% endif %}
                     <div class="box {{ box_class }}">
-                        <span class="box-val">{{ "%.2f"|format(val) }}</span>
-                        <span class="box-unit">&euro;</span>
+                        <div class="box-content">
+                            <span class="box-val">{{ "%.2f"|format(val) }}</span>
+                            <span class="box-unit">&euro;</span>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -357,6 +367,7 @@
             <div class="ticket" style="border: 1px dashed #f3f4f6; opacity: 0.05;"></div>
             {% endif %}
         {% endfor %}
+        <div class="clear"></div>
     </div>
     {% endfor %}
 </body>
