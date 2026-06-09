@@ -1,0 +1,10 @@
+services:
+  ticket-generator:
+    build: .
+    container_name: ticket-generator-app
+    ports:
+      - "3333:3333"
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=development-secret-key-1234
+    restart: unless-stopped

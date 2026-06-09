@@ -1,0 +1,5 @@
+.system_generated/
+__pycache__/
+*.metadata.json
+*.pyc
+.DS_Store
