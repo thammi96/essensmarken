@@ -1,8 +1,18 @@
 import os
 import base64
+import time
+import logging
 from functools import wraps
 from flask import Flask, render_template, request, send_file, redirect, url_for, session, flash
 from weasyprint import HTML
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 # Secure secret key from environment or fallback
@@ -89,6 +99,9 @@ def index():
 
 @app.route("/generate", methods=["POST"])
 def generate_pdf():
+    t_start = time.time()
+    logger.info("Starting PDF generation request...")
+    
     title = request.form.get("title", "Vereinsfest 2026")
     event_date = request.form.get("event_date", "")
     total_value_str = request.form.get("total_value", "10.00")
@@ -126,6 +139,9 @@ def generate_pdf():
         encoded = base64.b64encode(file_content).decode("utf-8")
         logo_base64 = f"data:{mime_type};base64,{encoded}"
         
+    t_inputs = time.time()
+    logger.info(f"Input parsing & base64 logo conversion complete in {t_inputs - t_start:.4f}s")
+        
     # Render PDF template using Flask templates
     rendered_html = render_template(
         "pdf_template.html",
@@ -139,8 +155,18 @@ def generate_pdf():
         grid_layout=grid_layout
     )
     
+    t_template = time.time()
+    logger.info(f"HTML Template rendering complete in {t_template - t_inputs:.4f}s")
+    
     # Generate PDF via WeasyPrint
-    pdf_bytes = HTML(string=rendered_html).write_pdf()
+    html_doc = HTML(string=rendered_html)
+    t_weasy_init = time.time()
+    logger.info(f"WeasyPrint HTML object instantiated in {t_weasy_init - t_template:.4f}s")
+    
+    pdf_bytes = html_doc.write_pdf()
+    t_weasy_pdf = time.time()
+    logger.info(f"WeasyPrint PDF compilation (write_pdf) complete in {t_weasy_pdf - t_weasy_init:.4f}s")
+    logger.info(f"Total request generation time: {t_weasy_pdf - t_start:.4f}s for {ticket_count} tickets ({grid_layout} grid)")
     
     filename = f"verzehrkarten_{title.lower().replace(' ', '_')}.pdf"
     
