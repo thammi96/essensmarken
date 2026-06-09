@@ -516,47 +516,87 @@
         const loadingProgressBar = document.getElementById('loading-progress-bar');
         const loadingPercentage = document.getElementById('loading-percentage');
 
-        form.addEventListener('submit', () => {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent standard page reload/submit
+            
             // Show overlay modal
             loadingOverlay.classList.remove('hidden');
             
             let progress = 0;
             loadingProgressBar.style.width = '0%';
+            loadingProgressBar.className = "bg-gradient-to-r from-blue-600 to-indigo-600 h-2 transition-all duration-300 ease-out";
             loadingPercentage.textContent = '0% abgeschlossen';
             
             // Increment progress simulated over time
             const interval = setInterval(() => {
-                if (progress < 95) {
-                    let increment = progress < 50 ? 6 : (progress < 80 ? 2 : 0.5);
+                if (progress < 90) {
+                    let increment = progress < 50 ? 8 : (progress < 80 ? 3 : 0.8);
                     progress += increment;
-                    if (progress > 95) progress = 95;
-                    
                     loadingProgressBar.style.width = `${progress}%`;
                     loadingPercentage.textContent = `${Math.round(progress)}% abgeschlossen`;
                 }
             }, 150);
 
-            // Close loader once the window regains focus (indicates download initiated)
-            const handleFocus = () => {
-                setTimeout(() => {
-                    loadingProgressBar.style.width = '100%';
-                    loadingPercentage.textContent = 'Erfolgreich generiert!';
-                    setTimeout(() => {
-                        loadingOverlay.classList.add('hidden');
-                        clearInterval(interval);
-                    }, 500);
-                }, 300);
-            };
+            try {
+                const formData = new FormData(form);
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            // Setup temporary listeners to dismiss loader
-            window.addEventListener('focus', handleFocus, { once: true });
-            
-            // Backup auto-close after 25 seconds in case focus listener is bypassed
-            setTimeout(() => {
-                loadingOverlay.classList.add('hidden');
+                if (!response.ok) {
+                    throw new Error('Fehler bei der PDF-Generierung auf dem Server.');
+                }
+
+                // Complete the progress bar
                 clearInterval(interval);
-                window.removeEventListener('focus', handleFocus);
-            }, 25000);
+                loadingProgressBar.style.width = '100%';
+                loadingPercentage.textContent = 'Erfolgreich generiert!';
+
+                const blob = await response.blob();
+                
+                // Get filename from response header or default
+                let filename = 'verzehrkarten.pdf';
+                const disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) { 
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                } else {
+                    const titleVal = titleInput.value.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                    filename = `verzehrkarten_${titleVal}.pdf`;
+                }
+
+                // Trigger programmatic download of the blob
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                // Hide overlay after animation
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                }, 800);
+
+            } catch (error) {
+                console.error(error);
+                clearInterval(interval);
+                loadingPercentage.textContent = 'Fehler bei der Generierung!';
+                // Turn bar red to signal error state
+                loadingProgressBar.className = "bg-red-500 h-2 transition-all duration-300";
+                loadingProgressBar.style.width = '100%';
+                
+                // Dismiss after a few seconds
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                }, 3000);
+            }
         });
     </script>
 </body>
