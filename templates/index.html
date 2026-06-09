@@ -33,6 +33,30 @@
     </style>
 </head>
 <body class="py-8 px-4 sm:px-6 lg:px-8">
+    <!-- Loading Overlay Modal -->
+    <div id="loading-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
+        <div class="glass-card max-w-sm w-full mx-4 p-8 rounded-2xl shadow-2xl text-center space-y-4 border border-white/20">
+            <div class="flex justify-center">
+                <div class="relative w-16 h-16">
+                    <div class="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-600 animate-spin"></div>
+                    <div class="absolute inset-2 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-extrabold animate-pulse text-sm">
+                        PDF
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-1">
+                <h3 class="text-lg font-bold text-gray-900">PDF wird generiert</h3>
+                <p class="text-sm text-gray-500">Die Wertmarken werden arrangiert und druckoptimiert...</p>
+            </div>
+            
+            <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div id="loading-progress-bar" class="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 w-0 transition-all duration-300 ease-out"></div>
+            </div>
+            <div class="text-xs text-blue-600 font-semibold" id="loading-percentage">0% abgeschlossen</div>
+        </div>
+    </div>
+
     <div class="max-w-6xl mx-auto">
         <!-- Header -->
         <header class="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4">
@@ -485,6 +509,55 @@
             });
             updatePageEstimate();
         }
+
+        // Form Submit Progress Loader
+        const form = document.getElementById('generator-form');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingProgressBar = document.getElementById('loading-progress-bar');
+        const loadingPercentage = document.getElementById('loading-percentage');
+
+        form.addEventListener('submit', () => {
+            // Show overlay modal
+            loadingOverlay.classList.remove('hidden');
+            
+            let progress = 0;
+            loadingProgressBar.style.width = '0%';
+            loadingPercentage.textContent = '0% abgeschlossen';
+            
+            // Increment progress simulated over time
+            const interval = setInterval(() => {
+                if (progress < 95) {
+                    let increment = progress < 50 ? 6 : (progress < 80 ? 2 : 0.5);
+                    progress += increment;
+                    if (progress > 95) progress = 95;
+                    
+                    loadingProgressBar.style.width = `${progress}%`;
+                    loadingPercentage.textContent = `${Math.round(progress)}% abgeschlossen`;
+                }
+            }, 150);
+
+            // Close loader once the window regains focus (indicates download initiated)
+            const handleFocus = () => {
+                setTimeout(() => {
+                    loadingProgressBar.style.width = '100%';
+                    loadingPercentage.textContent = 'Erfolgreich generiert!';
+                    setTimeout(() => {
+                        loadingOverlay.classList.add('hidden');
+                        clearInterval(interval);
+                    }, 500);
+                }, 300);
+            };
+
+            // Setup temporary listeners to dismiss loader
+            window.addEventListener('focus', handleFocus, { once: true });
+            
+            // Backup auto-close after 25 seconds in case focus listener is bypassed
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+                clearInterval(interval);
+                window.removeEventListener('focus', handleFocus);
+            }, 25000);
+        });
     </script>
 </body>
 </html>
